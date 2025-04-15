@@ -1,28 +1,22 @@
-# Julian Buendia
-# April 11, 2025
-# 
-# The following code creates the symbol table for dynamic memory allocation
+# Benjamin Goldberg
+#
+#
+#
+# Create the Chunk Availability Array
+#
+
 
 .data
-    prompt: .asciiz "Enter variable name: "
-    userInput: .space 22
+
 .text
-    main:
-        # Prompt user to enter variable name
-        li $v0, 4
-        la $a0, prompt
-        syscall
 
-        # Store variable name
-        li $v0, 8 # prepare to read string
-        la $a0, userInput # load userInput variable address onto register
-        li $a1, 22 # max characters = 22
-        syscall
+main: 
+    # save the original stack pointer in $s0
+    move $s0, $sp
+    li $t0, 0   # this will be the chunk index as it is allocated
+    li $t1, 128 # total number of chunks to allocate
 
-        li $v0, 4
-        la $a0, userInput
-        syscall
+allocate_chunk_array:
+    beq $t0, t1, exit
 
-        # exit program
-        li $v0, 10
-        syscall
+    addi $sp, $sp, -32 
