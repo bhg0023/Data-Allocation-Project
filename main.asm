@@ -14,7 +14,7 @@
     chunkArray: .space 64 # 64 bytes for chunk availability (0 is free, 1 is allocated)
     symbolTable: .space 250 # 10 entries * 25 bytes per entry
     mallocFailMsg: .asciiz "Error: No free memory chunks available. \n"
-    noUserSlots: .asciiz "Error: No used slots in symbol table \n"
+    noUsedSlots: .asciiz "Error: No used slots in symbol table \n"
     noFreeSlots: .asciiz "Error: No free slots in symbol table \n"
     nameUsed: .asciiz "Error: Variable name already in use \n"
     sizePrompt: .asciiz "Enter size (bytes to allocate): "
@@ -79,6 +79,48 @@ malloc:
     la $a0, userInput
     syscall
 
+    move $s6, $a0
+
+    # check if variable is in symbol table
+
+    la $s0, symbolTable
+    li $s2, 0
+
+check_used_slot: 
+    li $t7, 0   # init char index to 0
+    li $s3, 25  # number of bytes in an entry
+    li $t8, 10  # number of entries
+    li $s7, 1 # for checking validity bit 1
+    mul $s4, $s2, $s3   # offset = index * number of bytes in an entry
+    add $s5, $s0, $s4   # $s5 contains symbolTable[$s4]
+    lb $s4, 0($s5)  # load the validity bit into $s6
+    beq $s4, $s7, check_name_loop   # if validity bit is 1, go to read name loop
+    addi $s2, $s2, 1 # iterate symbolTable index
+    blt $s2, $t8, check_used_slot
+    j name_not_found
+
+check_name_loop:
+    lb $t1, 0($s6)  # store first bit of userInput in $t1
+    addi $a3, $t7, 1    # read index with offset 1 (for validity bit)
+    add $t9, $s5, $a3  # symbol table index + copy index with offset
+    lb $t3, 0($t9)  # load char from symbol table into $t3
+    bne $t1, $t3, check_next_slot  # check if char in userInput is the same as char in symbol table. If not equal, go back to find_used_slot
+    beqz $t1, name_found  # if null char found, go to remove entry
+    addi $s6, $s6, 1    # iterate to next char
+    addi $t7, $t7, 1    # iterate copy Index
+    j check_name_loop 
+
+check_next_slot:
+    addi $s2, $s2, 1
+    blt $s2, $t8, check_used_slot
+
+name_found:
+    li $v0, 4
+    la $a0, nameUsed
+    syscall
+    j prompt
+
+name_not_found:
     # prompt user for allocation size
     li $v0, 4
     la $a0, sizePrompt
@@ -158,6 +200,7 @@ malloc_fail:
     syscall
 
     li $t0, 0          # Start at index 0
+    j prompt
 
 find_free_slot: 
     li $s3, 25  # number of bytes in an entry
@@ -196,26 +239,10 @@ store_chunks:
     addi $t8, $s5, 23
     sb $t7, 0($t8)
 
-    li $v0, 1
-    move $a0, $t7
-    syscall
-
-    li $v0, 4
-    la $a0, newLine
-    syscall
-
     # store to_chunk (byte 24 in symbol table line)
     addi $t8, $s5, 24
     addi $t4, $v1, -1 # to_chunk = last allocated indexf
     sb $t4, 0($t8)
-
-    li $v0, 1
-    move $a0, $t4
-    syscall
-
-    li $v0, 4
-    la $a0, newLine
-    syscall
 
     j print_chunk_array
 
@@ -225,7 +252,7 @@ print_chunk_array:
     li $t0, 0   # reinitilize counter
 
 print_chunk_array_loop:
-    bge $t0, 64, prompt # Exit when we've printed all 64 chunks
+    bge $t0, 64, print_chunk_array_done # Exit when we've printed all 64 chunks
     add $a3, $t2, $t0 # Address of chunkArray[$t0]
     lb $a1, 0($a3)    # Load the value of the chunk
     li $v0, 1         # Prepare to print the chunk value
@@ -234,6 +261,11 @@ print_chunk_array_loop:
     addi $t0, $t0, 1  # Move to the next chunk
     j print_chunk_array_loop
 
+print_chunk_array_done:
+    li $t0, 0
+    li $t6, 0
+    li $s1, 0
+    j prompt
 
 free: 
     # Procedure for handling memory deallocation
@@ -293,7 +325,6 @@ next_slot:
     la $a0, noUsedSlots
     syscall
     j prompt
-
 
 
 remove_entry:
