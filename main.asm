@@ -94,9 +94,9 @@ check_used_slot:
     mul $s4, $s2, $s3   # offset = index * number of bytes in an entry
     add $s5, $s0, $s4   # $s5 contains symbolTable[$s4]
     lb $s4, 0($s5)  # load the validity bit into $s6
-    beq $s4, $s7, check_name_loop   # if validity bit is 1, go to read name loop
+    beq $s4, $s7, check_name_loop   # if validity bit is 1, go to check name loop
     addi $s2, $s2, 1 # iterate symbolTable index
-    blt $s2, $t8, check_used_slot
+    ble $s2, $t8, check_next_slot
     j name_not_found
 
 check_name_loop:
@@ -105,13 +105,14 @@ check_name_loop:
     add $t9, $s5, $a3  # symbol table index + copy index with offset
     lb $t3, 0($t9)  # load char from symbol table into $t3
     bne $t1, $t3, check_next_slot  # check if char in userInput is the same as char in symbol table. If not equal, go back to find_used_slot
-    beqz $t1, name_found  # if null char found, go to remove entry
+    beqz $t1, name_found  # if null char found, go to name found
     addi $s6, $s6, 1    # iterate to next char
     addi $t7, $t7, 1    # iterate copy Index
     j check_name_loop 
 
 check_next_slot:
     addi $s2, $s2, 1
+    bge $s2, $t8, name_not_found
     blt $s2, $t8, check_used_slot
 
 name_found:
@@ -121,6 +122,8 @@ name_found:
     j prompt
 
 name_not_found:
+
+
     # prompt user for allocation size
     li $v0, 4
     la $a0, sizePrompt
